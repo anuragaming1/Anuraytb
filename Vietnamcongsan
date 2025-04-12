@@ -1038,3 +1038,377 @@ spawn(function()
         end)
     end
 end)
+-- // Anura Hub - Auto Bounty Part12.lua (Auto bật Aura, Instinct, V3, V4)
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local lp = game.Players.LocalPlayer
+
+-- Hàm bấm phím
+function PressKey(key)
+    VirtualInputManager:SendKeyEvent(true, key, false, game)
+    wait(0.1)
+    VirtualInputManager:SendKeyEvent(false, key, false, game)
+end
+
+-- Tự động bật Aura (phím J), Instinct (E), V3 (T), V4 (Y)
+spawn(function()
+    while true do
+        wait(3)
+        pcall(function()
+            -- Auto bật Aura nếu chưa bật
+            if lp.Character:FindFirstChild("HasBuso") == nil then
+                PressKey("J")
+            end
+
+            -- Auto bật Instinct nếu chưa bật
+            if lp.Character:FindFirstChild("FlashStep") == nil then
+                PressKey("E")
+            end
+
+            -- Tộc V3 (T) và V4 (Y) không thể xác định trực tiếp nên sẽ spam bật liên tục
+            PressKey("T") -- V3
+            wait(0.2)
+            PressKey("Y") -- V4
+        end)
+    end
+end)
+--[[
+  Anura Hub - Auto Bounty | Part13.lua
+  Nội dung:
+    - Tự động triệu hồi Sea Beast khi bounty >= 10 triệu
+    - Combo skill mượt hơn, chính xác hơn, delay giảm còn 0.2s
+]]
+
+local function GetBounty()
+    local plr = game.Players.LocalPlayer
+    local stats = plr:FindFirstChild("leaderstats")
+    if stats and stats:FindFirstChild("Bounty") then
+        local bountyStr = stats.Bounty.Value
+        return tonumber(bountyStr:gsub(",", ""))
+    end
+    return 0
+end
+
+-- Auto Summon Sea Beast khi đạt 10 triệu bounty
+spawn(function()
+    while task.wait(2) do
+        if GetBounty() >= 10000000 then
+            keypress(0x4B) -- K (triệu hồi Sea Beast)
+            wait(0.3)
+            keyrelease(0x4B)
+        end
+    end
+end)
+
+-- Combo Skill cải tiến
+local comboSkills = {
+    {Weapon = "Melee", Key = "C"},
+    {Weapon = "Melee", Key = "X"},
+    {Weapon = "Fruit", Key = "Z"},
+    {Weapon = "Fruit", Key = "X"},
+    {Weapon = "Melee", Key = "Z"},
+    {Weapon = "Sword", Key = "Z"},
+    {Weapon = "Gun", Key = "X"},
+    {Weapon = "Fruit", Key = "C"},
+    {Weapon = "Sword", Key = "X"},
+    {Weapon = "Gun", Key = "Z"},
+    {Weapon = "Fruit", Key = "V"},
+    {Weapon = "Fruit", Key = "F"},
+}
+
+-- Đổi vũ khí
+function SwitchWeapon(name)
+    local inv = game.Players.LocalPlayer.Backpack:GetChildren()
+    for _, tool in pairs(inv) do
+        if tool:IsA("Tool") and string.find(tool.Name:lower(), name:lower()) then
+            game.Players.LocalPlayer.Character.Humanoid:EquipTool(tool)
+            wait(0.1)
+            break
+        end
+    end
+end
+
+-- Sử dụng phím
+function PressKey(key)
+    keypress(string.byte(key:upper()))
+    wait(0.1)
+    keyrelease(string.byte(key:upper()))
+end
+
+-- Chạy combo skill liên tục
+spawn(function()
+    while task.wait(0.5) do
+        for _, skill in pairs(comboSkills) do
+            SwitchWeapon(skill.Weapon)
+            wait(0.1)
+            PressKey(skill.Key)
+            wait(0.2)
+        end
+    end
+end)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local RunService = game:GetService("RunService")
+
+local function IsSafeZone(plr)
+    local char = plr.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return true end
+    local pos = char.HumanoidRootPart.Position
+    -- Điều kiện SafeZone: gần NPC hoặc khu vực không PVP
+    return workspace:FindFirstChild("SafeZone") and (pos - workspace.SafeZone.Position).Magnitude < 150
+end
+
+local function HasPvP(plr)
+    local tag = plr:FindFirstChild("Data") and plr.Data:FindFirstChild("PvP")
+    return tag and tag.Value == true
+end
+
+local function GetClosestPlayer()
+    local closestPlayer, closestDist = nil, math.huge
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            if not IsSafeZone(plr) and HasPvP(plr) then
+                local dist = (plr.Character.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    closestPlayer = plr
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function EquipMelee()
+    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+        if tool:IsA("Tool") and (tool.ToolTip == "Melee" or tool.Name:lower():find("combat") or tool.Name:lower():find("fighting")) then
+            LocalPlayer.Character.Humanoid:EquipTool(tool)
+            break
+        end
+    end
+end
+
+RunService.Stepped:Connect(function()
+    local target = GetClosestPlayer()
+    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+        local dist = (target.Character.HumanoidRootPart.Position - Character.HumanoidRootPart.Position).Magnitude
+        if dist < 25 then
+            EquipMelee()
+            -- Gõ thường nếu ở gần player
+            mouse1click()
+        end
+    end
+end)
+-- ANTI LAG NÂNG CAO
+local debris = {
+    "Rain", "Dust", "Lightning", "FallingLeaves", "Spark", "Trail", "Light", "Fire", "Smoke", "Cloud", "Ray"
+}
+
+for _, desc in ipairs(debris) do
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Light") or v:IsA("Beam") or v:IsA("Fire") or v:IsA("Smoke") then
+            if v.Name:lower():find(desc:lower()) or v.Parent.Name:lower():find(desc:lower()) then
+                v:Destroy()
+            end
+        end
+    end
+end
+
+-- Auto dọn hiệu ứng mỗi 30 giây
+while true do
+    task.wait(30)
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Light") or v:IsA("Beam") or v:IsA("Fire") or v:IsA("Smoke") then
+            v:Destroy()
+        end
+    end
+end
+-- AUTO NÉ PLAYER NGUY HIỂM / BOSS
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HRP = Character:WaitForChild("HumanoidRootPart")
+
+RunService.Heartbeat:Connect(function()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Model") and v:FindFirstChild("Humanoid") and v:FindFirstChild("HumanoidRootPart") then
+            local h = v.Humanoid
+            local hrp = v.HumanoidRootPart
+            local isDanger = false
+            if h.Health > 0 then
+                if v.Name:lower():find("boss") or v.Name:lower():find("sea king") or v.Name:lower():find("rip_") then
+                    isDanger = true
+                elseif Players:FindFirstChild(v.Name) and v:FindFirstChild("HasBuso") then
+                    isDanger = true
+                end
+            end
+
+            if isDanger then
+                local dist = (HRP.Position - hrp.Position).Magnitude
+                if dist < 100 then
+                    local direction = (HRP.Position - hrp.Position).Unit * 200
+                    HRP.CFrame = CFrame.new(HRP.Position + direction)
+                end
+            end
+        end
+    end
+end)
+local Players = game:GetService("Players")
+local Stats = game:GetService("Stats")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local HttpService = game:GetService("HttpService")
+
+local screenGui = Instance.new("ScreenGui", game.CoreGui)
+screenGui.Name = "AnuraHUD"
+screenGui.ResetOnSpawn = false
+
+local frame = Instance.new("Frame", screenGui)
+frame.Position = UDim2.new(0, 10, 0, 10)
+frame.Size = UDim2.new(0, 300, 0, 160)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BackgroundTransparency = 0.2
+frame.BorderSizePixel = 0
+frame.Visible = true
+frame.Active = true
+frame.Draggable = true
+
+local infoLabels = {}
+local labelNames = {
+    "Target", "Bounty", "Kills", "Ping", "FPS", "Sea", "PvP", "Time Used"
+}
+
+for i, name in ipairs(labelNames) do
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1, -10, 0, 18)
+    lbl.Position = UDim2.new(0, 5, 0, (i - 1) * 18)
+    lbl.BackgroundTransparency = 1
+    lbl.TextColor3 = Color3.fromRGB(255, 255, 255)
+    lbl.Font = Enum.Font.Code
+    lbl.TextSize = 14
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    infoLabels[name] = lbl
+end
+
+-- Biến hỗ trợ
+local bounty = 0
+local kills = 0
+local scriptStart = tick()
+
+-- Hàm xác định Sea
+local function getCurrentSea()
+    local placeId = game.PlaceId
+    if placeId == 2753915549 then return "Sea 1"
+    elseif placeId == 4442272183 then return "Sea 2"
+    elseif placeId == 7449423635 then return "Sea 3"
+    else return "Unknown" end
+end
+
+-- Cập nhật HUD mỗi giây
+RunService.RenderStepped:Connect(function()
+    local fps = math.floor(1 / RunService.RenderStepped:Wait())
+    local ping = Stats.Network.ServerStatsItem["Data Ping"]:GetValueString()
+    ping = string.gsub(ping, " ms", "")
+
+    local char = LocalPlayer.Character
+    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+    local currentTarget = _G.CurrentTarget or "None"
+    local pvp = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("CombatFramework") and "On" or "Off"
+
+    infoLabels["Target"].Text = "Target: " .. tostring(currentTarget)
+    infoLabels["Bounty"].Text = "Bounty: " .. LocalPlayer.leaderstats and LocalPlayer.leaderstats:FindFirstChild("Bounty") and LocalPlayer.leaderstats.Bounty.Value or "?"
+    infoLabels["Kills"].Text = "Kills: " .. tostring(_G.TotalKills or kills)
+    infoLabels["Ping"].Text = "Ping: " .. tostring(ping) .. " ms"
+    infoLabels["FPS"].Text = "FPS: " .. tostring(fps)
+    infoLabels["Sea"].Text = "Sea: " .. getCurrentSea()
+    infoLabels["PvP"].Text = "PvP: " .. pvp
+    infoLabels["Time Used"].Text = "Time: " .. os.date("!%H:%M:%S", tick() - scriptStart)
+end)
+-- Yêu cầu Part16 phải đã tạo GUI `AnuraHUD` và `frame`
+local frame = game.CoreGui:FindFirstChild("AnuraHUD") and game.CoreGui.AnuraHUD:FindFirstChildOfClass("Frame")
+if not frame then return end
+
+-- Container cho các nút
+local btnFrame = Instance.new("Frame", frame)
+btnFrame.Position = UDim2.new(0, 0, 1, 5)
+btnFrame.Size = UDim2.new(1, 0, 0, 90)
+btnFrame.BackgroundTransparency = 1
+
+-- Danh sách nút và hành động tương ứng
+local buttons = {
+    {Name = "Toggle HUD", Action = function()
+        for _, v in ipairs(frame:GetChildren()) do
+            if v:IsA("TextLabel") then
+                v.Visible = not v.Visible
+            end
+        end
+    end},
+
+    {Name = "Reload", Action = function()
+        loadstring(game:HttpGet("https://pastebin.com/raw/YourScriptHere"))()
+    end},
+
+    {Name = "Random TP", Action = function()
+        local char = game.Players.LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local pos = Vector3.new(math.random(-5000,5000), 300, math.random(-5000,5000))
+            char:MoveTo(pos)
+        end
+    end},
+
+    {Name = "Exit GUI", Action = function()
+        if game.CoreGui:FindFirstChild("AnuraHUD") then
+            game.CoreGui.AnuraHUD:Destroy()
+        end
+    end}
+}
+
+-- Tạo nút
+for i, btnInfo in ipairs(buttons) do
+    local btn = Instance.new("TextButton", btnFrame)
+    btn.Size = UDim2.new(1, -10, 0, 20)
+    btn.Position = UDim2.new(0, 5, 0, (i - 1) * 22)
+    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Code
+    btn.TextSize = 14
+    btn.Text = btnInfo.Name
+    btn.MouseButton1Click:Connect(btnInfo.Action)
+end
+--// Config chọn team: "Pirates", "Marines" hoặc "Random"
+local teamConfig = "Pirates" -- Bạn có thể đổi thành "Marines" hoặc "Random"
+
+--// Hàm chọn team
+local function chooseTeam()
+    local teams = {
+        Pirates = "JoinPirates",
+        Marines = "JoinMarines"
+    }
+
+    local player = game.Players.LocalPlayer
+    local rep = game.ReplicatedStorage
+
+    local chosen = teamConfig
+    if teamConfig == "Random" then
+        chosen = math.random(1, 2) == 1 and "Pirates" or "Marines"
+    end
+
+    if rep:FindFirstChild(teams[chosen]) then
+        rep[teams[chosen]]:InvokeServer()
+    end
+end
+
+--// Kiểm tra nếu chưa có team thì chọn
+task.spawn(function()
+    while task.wait(1) do
+        local player = game.Players.LocalPlayer
+        if player and not player.Team then
+            chooseTeam()
+        end
+    end
+end)
