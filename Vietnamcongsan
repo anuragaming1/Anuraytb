@@ -1412,3 +1412,69 @@ task.spawn(function()
         end
     end
 end)
+--// Cấu hình
+local safeHeight = 900
+local lowHP = 0.2  -- 20%
+local returnHP = 0.3 -- 30%
+local flyingAway = false
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local player = game.Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local root = char:WaitForChild("HumanoidRootPart")
+
+--// Hàm Tween bay đến vị trí an toàn
+local function tweenTo(pos)
+    local info = TweenInfo.new((root.Position - pos).Magnitude / 300, Enum.EasingStyle.Linear)
+    local goal = {CFrame = CFrame.new(pos)}
+    TweenService:Create(root, info, goal):Play()
+end
+
+--// Theo dõi máu
+RunService.RenderStepped:Connect(function()
+    pcall(function()
+        local hp = hum.Health / hum.MaxHealth
+        if hp < lowHP and not flyingAway then
+            flyingAway = true
+            local pos = root.Position + Vector3.new(0, safeHeight, 0)
+            tweenTo(pos)
+        elseif hp > returnHP and flyingAway then
+            flyingAway = false
+            local nearestPlayer = nil
+            local shortest = math.huge
+            for _, v in pairs(game.Players:GetPlayers()) do
+                if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Team ~= player.Team then
+                    local dist = (v.Character.HumanoidRootPart.Position - root.Position).Magnitude
+                    if dist < shortest then
+                        shortest = dist
+                        nearestPlayer = v
+                    end
+                end
+            end
+            if nearestPlayer then
+                tweenTo(nearestPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 5, 0))
+            end
+        end
+    end)
+end)
+-- Part20.lua | Anura Hub - Auto Combo nâng cao + điều khiển thông minh
+
+local Players = game:GetService("Players") local LocalPlayer = Players.LocalPlayer local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait() local Humanoid = Character:WaitForChild("Humanoid") local ReplicatedStorage = game:GetService("ReplicatedStorage") local RunService = game:GetService("RunService") local VU = game:GetService("VirtualUser")
+
+local function IsSkillReady(skill) local success, result = pcall(function() return LocalPlayer.PlayerGui.Main.Skills[skill].Cooldown.Visible == false end) return success and result end
+
+local function PressKey(key) keypress(key) wait(0.1) keyrelease(key) end
+
+local function Equip(tool) for i,v in ipairs(LocalPlayer.Backpack:GetChildren()) do if v:IsA("Tool") and v.ToolTip == tool then Character.Humanoid:EquipTool(v) wait(0.1) return true end end return false end
+
+local WeaponOrder = { {"Melee", {"C", "X", "Z"}}, {"Fruit", {"Z", "X", "C", "V", "F"}}, {"Sword", {"Z", "X"}}, {"Gun", {"X", "Z"}}, }
+
+local function AttackWithAvailableSkill() for _, weapon in ipairs(WeaponOrder) do if Equip(weapon[1]) then for _, key in ipairs(weapon[2]) do if IsSkillReady(key) then PressKey(key) wait(0.2) return true end end end end return false end
+
+local function MeleeAttack() if Equip("Melee") then PressKey(0x46) -- phím F để đánh thường nếu không có kỹ năng sẵn sàng end end
+
+-- Vòng lặp chính spawn(function() while wait(0.3) do if Character and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0 then local attacked = AttackWithAvailableSkill() if not attacked then MeleeAttack() end end end end)
+
+print("[Anura Hub] Part20.lua - Auto Combo nâng cao đã load!")
+
