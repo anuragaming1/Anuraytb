@@ -1526,3 +1526,353 @@ end)
 
 --// Gợi ý log để theo dõi trạng thái
 warn("[AnuraHub] Auto Team + PvP đang chạy...")
+--// Part23.lua - Fix Auto Skill khi đang bay & Tăng tốc độ dùng chiêu
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+_G.AutoSkillEnabled = true
+local IsTweenFlying = false -- Cờ bay (sẽ được liên kết với hệ thống Tween ở các part trước)
+local SkillDelay = 0.2 -- Delay nhỏ giữa các skill (tối ưu hóa)
+
+-- Hàm kiểm tra đang bay
+function IsFlying()
+	if HumanoidRootPart and HumanoidRootPart.Velocity then
+		return math.abs(HumanoidRootPart.Velocity.Y) > 5
+	end
+	return false
+end
+
+-- Gọi skill theo phím (Z, X, C, V, F,...)
+function CastSkill(key)
+	pcall(function()
+		keypress(Enum.KeyCode[key])
+		wait(0.05)
+		keyrelease(Enum.KeyCode[key])
+	end)
+end
+
+-- Auto dùng chiêu theo chuỗi (luân phiên)
+local skillSequence = {"C", "X", "Z", "V", "F"}
+local currentSkill = 1
+
+-- Luồng dùng skill tự động
+task.spawn(function()
+	while _G.AutoSkillEnabled do
+		pcall(function()
+			local char = LocalPlayer.Character
+			if char and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
+				if not IsTweenFlying and not IsFlying() then
+					CastSkill(skillSequence[currentSkill])
+					currentSkill = currentSkill + 1
+					if currentSkill > #skillSequence then
+						currentSkill = 1
+					end
+					wait(SkillDelay)
+				else
+					wait(0.1) -- nếu đang bay thì chờ
+				end
+			end
+		end)
+		wait(0.01)
+	end
+end)
+--// Part24.lua - Tween TP đến player gần nhất + Đồng bộ trạng thái bay (IsTweenFlying)
+
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+local TweenSpeed = 300 -- tốc độ bay
+_G.TweenToTarget = true
+_G.IgnoreSafeZone = true
+_G.AutoKill = true
+
+-- Khai báo biến dùng chung
+IsTweenFlying = false -- đồng bộ với Part23.lua
+
+-- Hàm tìm player gần nhất
+function GetNearestPlayer()
+	local closest = nil
+	local shortestDistance = math.huge
+	for _, v in pairs(Players:GetPlayers()) do
+		if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Team ~= LocalPlayer.Team then
+			if v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+				local dist = (LocalPlayer.Character.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+				if dist < shortestDistance then
+					-- Bỏ qua nếu đang trong SafeZone
+					if not _G.IgnoreSafeZone or (v.Character:FindFirstChild("HumanoidRootPart") and not v.Character.HumanoidRootPart:FindFirstChild("SafeZone")) then
+						shortestDistance = dist
+						closest = v
+					end
+				end
+			end
+		end
+	end
+	return closest
+end
+
+-- Tween đến vị trí gần player
+function TweenToPosition(pos)
+	local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+	if root then
+		IsTweenFlying = true
+		local tweenInfo = TweenInfo.new((root.Position - pos).Magnitude / TweenSpeed, Enum.EasingStyle.Linear)
+		local tween = TweenService:Create(root, tweenInfo, {CFrame = CFrame.new(pos + Vector3.new(5, 0, 5))})
+		tween:Play()
+		tween.Completed:Wait()
+		IsTweenFlying = false
+	end
+end
+
+-- Luồng chính để liên tục bay đến player
+task.spawn(function()
+	while _G.TweenToTarget do
+		pcall(function()
+			local target = GetNearestPlayer()
+			if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+				TweenToPosition(target.Character.HumanoidRootPart.Position + Vector3.new(0, 2, 0))
+			end
+		end)
+		wait(0.5)
+	end
+end)
+--// Part25.lua - Auto Bounty: Combo liên tục khi đến target + bỏ qua SafeZone/PvP
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+-- Cấu hình
+local comboDelay = 0.2
+local lastAttackTime = 0
+local targetPlayer = nil
+
+-- Tự động dùng chiêu theo thứ tự
+local skillSequence = {
+	{"Melee", "C"}, {"Melee", "X"},
+	{"Fruit", "Z"}, {"Fruit", "X"},
+	{"Melee", "Z"}, {"Sword", "Z"},
+	{"Gun", "X"}, {"Fruit", "C"},
+	{"Sword", "X"}, {"Gun", "Z"},
+	{"Fruit", "V"}, {"Fruit", "F"}
+}
+
+-- Danh sách phím để đổi vũ khí
+local weaponKeyMap = {
+	["Melee"] = Enum.KeyCode.One,
+	["Sword"] = Enum.KeyCode.Two,
+	["Gun"] = Enum.KeyCode.Three,
+	["Fruit"] = Enum.KeyCode.Four
+}
+
+-- Đổi vũ khí
+function SwitchWeapon(weapon)
+	local key = weaponKeyMap[weapon]
+	if key then
+		VirtualInputManager:SendKeyEvent(true, key, false, game)
+		wait(0.1)
+	end
+end
+
+-- Dùng chiêu
+function UseSkill(skill)
+	VirtualInputManager:SendKeyEvent(true, Enum.KeyCode[skill], false, game)
+	wait(0.05)
+	VirtualInputManager:SendKeyEvent(false, Enum.KeyCode[skill], false, game)
+end
+
+-- Tấn công combo toàn bộ skill
+function DoFullCombo()
+	for _, pair in ipairs(skillSequence) do
+		if not IsTweenFlying then -- không dùng skill khi đang bay
+			local weapon, key = unpack(pair)
+			SwitchWeapon(weapon)
+			wait(0.1)
+			UseSkill(key)
+			wait(comboDelay)
+		end
+	end
+end
+
+-- Kiểm tra target có an toàn không
+function IsValidTarget(plr)
+	if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") then
+		if plr.Character.Humanoid.Health > 0 and plr.Team ~= LocalPlayer.Team then
+			if not plr.Character.HumanoidRootPart:FindFirstChild("SafeZone") then
+				return true
+			end
+		end
+	end
+	return false
+end
+
+-- Vòng lặp auto kill target khi gần
+spawn(function()
+	while wait(0.3) do
+		if _G.AutoKill then
+			local newTarget = GetNearestPlayer()
+			if newTarget and IsValidTarget(newTarget) then
+				targetPlayer = newTarget
+			else
+				targetPlayer = nil
+			end
+		end
+	end
+end)
+
+-- Tự đánh khi gần target
+RunService.RenderStepped:Connect(function()
+	if targetPlayer and IsValidTarget(targetPlayer) and not IsTweenFlying then
+		local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		local targetHRP = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if myHRP and targetHRP then
+			local dist = (myHRP.Position - targetHRP.Position).Magnitude
+			if dist < 40 then -- trong khoảng 40 để gây sát thương
+				if tick() - lastAttackTime > 2 then
+					lastAttackTime = tick()
+					DoFullCombo()
+				end
+			end
+		end
+	end
+end)
+--// Part26.lua - Anti Death: Bay lên cao khi yếu máu, trở lại khi hồi máu
+
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local Humanoid = Character:WaitForChild("Humanoid")
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+_G.AntiDieEnabled = true
+local isEscaping = false
+local normalY = 20
+local escapeY = 900
+local escapeTween = nil
+
+-- Bay đến tọa độ y mới
+function TweenToY(yHeight)
+	if HumanoidRootPart then
+		local goalPos = HumanoidRootPart.Position
+		goalPos = Vector3.new(goalPos.X, yHeight, goalPos.Z)
+
+		local tweenInfo = TweenInfo.new(1.2, Enum.EasingStyle.Linear)
+		escapeTween = TweenService:Create(HumanoidRootPart, tweenInfo, {CFrame = CFrame.new(goalPos)})
+		escapeTween:Play()
+	end
+end
+
+-- Theo dõi máu
+spawn(function()
+	while wait(0.5) do
+		if _G.AntiDieEnabled and Humanoid and Humanoid.Health > 0 then
+			local currentHealth = Humanoid.Health
+			local maxHealth = Humanoid.MaxHealth
+			local percent = (currentHealth / maxHealth) * 100
+
+			if percent < 20 and not isEscaping then
+				isEscaping = true
+				TweenToY(escapeY)
+			elseif percent > 30 and isEscaping then
+				isEscaping = false
+				TweenToY(normalY)
+			end
+		end
+	end
+end)
+--// Part27.lua - Tăng tốc bay Tween TP + thêm hiệu ứng khi bay
+
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HRP = Character:WaitForChild("HumanoidRootPart")
+
+-- Biến chung
+_G.TweenSpeed = 250
+local currentTween = nil
+local trailEffect = nil
+local isFlying = false
+
+-- Tạo hiệu ứng glow/trail khi bay
+function CreateTrail()
+    if not trailEffect then
+        trailEffect = Instance.new("Trail")
+        trailEffect.Attachment0 = Instance.new("Attachment", HRP)
+        trailEffect.Attachment1 = Instance.new("Attachment", HRP)
+        trailEffect.Color = ColorSequence.new(Color3.fromRGB(255, 255, 0
+--// Part27.lua - Hiệu ứng khi bay lên trốn chết (Anti Death Effect)
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart")
+
+-- Tạo vòng sáng quanh người
+function CreateEscapeEffect()
+	local attachment = Instance.new("Attachment", HumanoidRootPart)
+	local light = Instance.new("PointLight", HumanoidRootPart)
+	light.Color = Color3.fromRGB(255, 255, 0)
+	light.Brightness = 3
+	light.Range = 12
+	light.Shadows = true
+
+	local ring = Instance.new("ParticleEmitter")
+	ring.Texture = "rbxassetid://243098098" -- Vòng tròn sáng
+	ring.Rate = 5
+	ring.Lifetime = NumberRange.new(1)
+	ring.Speed = NumberRange.new(0)
+	ring.Rotation = NumberRange.new(0, 360)
+	ring.RotSpeed = NumberRange.new(10)
+	ring.Size = NumberSequence.new({NumberSequenceKeypoint.new(0, 2), NumberSequenceKeypoint.new(1, 0)})
+	ring.Transparency = NumberSequence.new({NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(1, 1)})
+	ring.Parent = attachment
+
+	-- Xóa hiệu ứng sau 5 giây
+	delay(5, function()
+		attachment:Destroy()
+		light:Destroy()
+	end)
+end
+
+-- Kết hợp với Anti Death ở Part26
+spawn(function()
+	while wait(0.5) do
+		pcall(function()
+			if _G.AntiDieEnabled and HumanoidRootPart and HumanoidRootPart.Position.Y > 600 then
+				CreateEscapeEffect()
+				wait(6) -- chờ một chút rồi mới tạo lại (tránh spam effect)
+			end
+		end)
+	end
+end)
+--// Part28.lua - Phát nhạc Quốc ca Việt Nam khi bật script
+
+local SoundService = game:GetService("SoundService")
+
+-- Chỉ phát một lần khi script được chạy
+if not _G.NationalMusicPlayed then
+    _G.NationalMusicPlayed = true
+
+    local nationalAnthem = Instance.new("Sound")
+    nationalAnthem.SoundId = "rbxassetid://1847637593" -- Quốc ca VN (bản không bản quyền trên Roblox)
+    nationalAnthem.Volume = 2
+    nationalAnthem.Looped = false
+    nationalAnthem.Name = "VietnamAnthem"
+    nationalAnthem.Parent = SoundService
+    nationalAnthem:Play()
+
+    -- Tự xóa sau khi phát xong
+    nationalAnthem.Ended:Connect(function()
+        nationalAnthem:Destroy()
+    end)
+end
