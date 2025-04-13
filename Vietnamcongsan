@@ -1458,23 +1458,57 @@ RunService.RenderStepped:Connect(function()
         end
     end)
 end)
--- Part20.lua | Anura Hub - Auto Combo nâng cao + điều khiển thông minh
+--[[
+███╗   ███╗██╗███╗   ██╗██╗███╗   ███╗███████╗
+████╗ ████║██║████╗  ██║██║████╗ ████║██╔════╝
+██╔████╔██║██║██╔██╗ ██║██║██╔████╔██║█████╗  
+██║╚██╔╝██║██║██║╚██╗██║██║██║╚██╔╝██║██╔══╝  
+██║ ╚═╝ ██║██║██║ ╚████║██║██║ ╚═╝ ██║███████╗
+╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝╚═╝     ╚═╝╚══════╝
+]]
 
-local Players = game:GetService("Players") local LocalPlayer = Players.LocalPlayer local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait() local Humanoid = Character:WaitForChild("Humanoid") local ReplicatedStorage = game:GetService("ReplicatedStorage") local RunService = game:GetService("RunService") local VU = game:GetService("VirtualUser")
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
 
-local function IsSkillReady(skill) local success, result = pcall(function() return LocalPlayer.PlayerGui.Main.Skills[skill].Cooldown.Visible == false end) return success and result end
+-- Tạo BillboardGui hiện thông báo trên màn hình
+local function createNotice(text1, text2)
+    local ScreenGui = Instance.new("ScreenGui")
+    ScreenGui.Name = "AnuraNoticeGui"
+    ScreenGui.ResetOnSpawn = false
+    ScreenGui.Parent = game:GetService("CoreGui")
 
-local function PressKey(key) keypress(key) wait(0.1) keyrelease(key) end
+    local function createTextLabel(text, positionY)
+        local TextLabel = Instance.new("TextLabel")
+        TextLabel.Text = text
+        TextLabel.Size = UDim2.new(1, 0, 0, 30)
+        TextLabel.Position = UDim2.new(0, 0, positionY, 0)
+        TextLabel.TextColor3 = Color3.fromRGB(255, 221, 0)
+        TextLabel.BackgroundTransparency = 1
+        TextLabel.Font = Enum.Font.SourceSansBold
+        TextLabel.TextScaled = true
+        TextLabel.ZIndex = 10
+        TextLabel.Parent = ScreenGui
+    end
 
-local function Equip(tool) for i,v in ipairs(LocalPlayer.Backpack:GetChildren()) do if v:IsA("Tool") and v.ToolTip == tool then Character.Humanoid:EquipTool(v) wait(0.1) return true end end return false end
+    createTextLabel("KỈ NIỆM 50 NĂM", 0.1)
+    createTextLabel("<NGÀY GIẢI PHÓNG MIỀN NAM , THỐNG NHẤT ĐẤT NƯỚC>", 0.15)
 
-local WeaponOrder = { {"Melee", {"C", "X", "Z"}}, {"Fruit", {"Z", "X", "C", "V", "F"}}, {"Sword", {"Z", "X"}}, {"Gun", {"X", "Z"}}, }
+    -- Tự ẩn sau 10s
+    task.delay(10, function()
+        if ScreenGui then
+            ScreenGui:Destroy()
+        end
+    end)
+end
 
-local function AttackWithAvailableSkill() for _, weapon in ipairs(WeaponOrder) do if Equip(weapon[1]) then for _, key in ipairs(weapon[2]) do if IsSkillReady(key) then PressKey(key) wait(0.2) return true end end end end return false end
+-- Hiện thông báo giữa màn hình
+createNotice()
 
-local function MeleeAttack() if Equip("Melee") then PressKey(0x46) -- phím F để đánh thường nếu không có kỹ năng sẵn sàng end end
-
--- Vòng lặp chính spawn(function() while wait(0.3) do if Character and Character:FindFirstChild("Humanoid") and Character.Humanoid.Health > 0 then local attacked = AttackWithAvailableSkill() if not attacked then MeleeAttack() end end end end)
-
-print("[Anura Hub] Part20.lua - Auto Combo nâng cao đã load!")
-
+-- Gửi tin nhắn vào chat
+StarterGui:SetCore("ChatMakeSystemMessage", {
+    Text = "【KỈ NIỆM 50 NĂM】<NGÀY GIẢI PHÓNG MIỀN NAM , THỐNG NHẤT ĐẤT NƯỚC>",
+    Color = Color3.fromRGB(255, 221, 0),
+    Font = Enum.Font.SourceSansBold,
+    FontSize = Enum.FontSize.Size24
+})
